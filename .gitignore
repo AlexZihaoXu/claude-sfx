@@ -1,0 +1,6 @@
+node_modules/
+*.log
+.DS_Store
+.finish.lock
+sfx.log
+bun.lockb

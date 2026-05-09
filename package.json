@@ -1,0 +1,42 @@
+{
+  "name": "claude-sfx",
+  "version": "0.1.0",
+  "description": "Sound effects for Claude Code: chime when Claude finishes a turn, beep when it needs your input.",
+  "type": "commonjs",
+  "bin": {
+    "claude-sfx-install": "bin/install.js",
+    "claude-sfx-uninstall": "bin/uninstall.js",
+    "claude-sfx-play": "bin/play.js"
+  },
+  "files": [
+    "bin",
+    "assets",
+    "install.sh",
+    "install.ps1",
+    "uninstall.sh",
+    "uninstall.ps1",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test:play:finish": "bun bin/play.js finish",
+    "test:play:notify": "bun bin/play.js notify"
+  },
+  "keywords": [
+    "claude-code",
+    "claude",
+    "hooks",
+    "sound",
+    "notification"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AlexZihaoXu/claude-sfx"
+  },
+  "homepage": "https://github.com/AlexZihaoXu/claude-sfx",
+  "license": "MIT",
+  "engines": {
+    "bun": ">=1.0.0",
+    "node": ">=18.0.0"
+  }
+}
