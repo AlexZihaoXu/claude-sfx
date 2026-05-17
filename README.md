@@ -4,13 +4,16 @@ Sound effects for [Claude Code](https://claude.com/code). Plays a chime when
 Claude finishes a turn, and a different one when it needs your input — so you
 can tab away and let it work.
 
-Wires three hook events in `~/.claude/settings.json`:
+Wires six hook entries in `~/.claude/settings.json`:
 
-| Event          | Sound         | Fires when                                        |
-|----------------|---------------|---------------------------------------------------|
-| `Stop`         | `finish.wav`  | Claude finishes responding (debounced — see below)|
-| `Notification` | `notify.wav`  | Claude is blocked on you (permission, idle 60s+)  |
-| `Elicitation`  | `notify.wav`  | An MCP server is asking you a question            |
+| Event                          | Sound         | Fires when                                                       |
+|--------------------------------|---------------|------------------------------------------------------------------|
+| `Stop`                         | `finish.wav`  | Claude finishes responding (debounced — see below)               |
+| `Notification`                 | `notify.wav`  | Claude is blocked on you (idle 60s+)                             |
+| `Elicitation`                  | `notify.wav`  | An MCP server is asking you a question                           |
+| `PreToolUse:AskUserQuestion`   | `notify.wav`  | Claude calls the built-in `AskUserQuestion` tool                 |
+| `PermissionRequest`            | `notify.wav`  | A tool needs a permission decision (see "Permission prompts")    |
+| `PreToolUse` (unmatched)       | —             | Defensive: clears any stale permission lock                      |
 
 Cross-platform: Windows, macOS, Linux. One binary (Bun), no per-OS scripts.
 
@@ -28,7 +31,7 @@ The installer:
 
 1. `bun install -g github:AlexZihaoXu/claude-sfx` — drops `claude-sfx-play`,
    `claude-sfx-install`, and `claude-sfx-uninstall` on PATH (bun's global bin).
-2. `claude-sfx-install` — adds the three hook entries to `~/.claude/settings.json`,
+2. `claude-sfx-install` — adds the hook entries to `~/.claude/settings.json`,
    safely merged with anything that's already there.
 
 You need [bun](https://bun.sh) installed first (`brew install bun`,
@@ -52,14 +55,31 @@ claude-sfx-uninstall && bun remove -g claude-sfx
 Only entries claude-sfx added are removed — every other field in your
 `settings.json` is left alone.
 
-## Why these three events (and not `PermissionRequest`)
+## Permission prompts
 
-Claude Code emits `PermissionRequest` for **every** tool permission check,
-including auto-approved ones — there's no payload field that distinguishes a
-real dialog from a silent pass-through, so wiring it would beep on essentially
-every tool call. The `Notification` event with `notification_type =
-permission_prompt` fires only when a real dialog appears, which is the actual
-"user attention needed" signal. Same for the post-60s idle case.
+`Notification` only fires after ~60s of idle waiting, so it misses prompts
+you're actively attending to. The actual signal is `PermissionRequest`,
+which fires when a tool needs a permission decision that isn't already
+covered by `permissions.allow`.
+
+The flow:
+
+1. `PermissionRequest` arms a lock file
+   (`~/.claude-sfx/permission.lock`), spawns a detached worker, and exits
+   immediately so the hook doesn't block Claude Code.
+2. The worker waits `PERMISSION_PENDING_DELAY_MS` (default 300 ms), then
+   atomically claims the lock (via `unlinkSync`) and plays `notify.wav`.
+   Multiple rapid prompts collapse to a single sound — only one worker
+   wins the unlink.
+3. The unmatched `PreToolUse` hook deletes any stale lock left by a
+   crashed worker — defensive cleanup, normally a no-op.
+
+Tools covered by your `permissions.allow` list never fire
+`PermissionRequest` at all, so they stay silent. Anything that pops a
+dialog (or would have, before a session-scope rule auto-resolved it) gets
+the chime.
+
+Tunable via `PERMISSION_PENDING_DELAY_MS` at the top of `bin/play.js`.
 
 See [Claude Code hooks docs](https://docs.claude.com/en/docs/claude-code/hooks)
 for the full list of events.

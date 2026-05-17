@@ -1,6 +1,6 @@
 {
   "name": "claude-sfx",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Sound effects for Claude Code: chime when Claude finishes a turn, beep when it needs your input.",
   "type": "commonjs",
   "bin": {

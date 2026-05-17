@@ -11,18 +11,27 @@ const localPlayPath = path.join(here, "play.js");
 const settingsDir = path.join(os.homedir(), ".claude");
 const settingsPath = path.join(settingsDir, "settings.json");
 
-// Hook event -> sound name.
+// Hook entries we install. `matcher` is only meaningful for PreToolUse —
+// it scopes the hook to a single tool name so we don't fire on every call.
 //
-// PermissionRequest is intentionally omitted: it fires for every permission
-// check (including auto-approved ones) with no payload field distinguishing
-// the two, so it would beep on essentially every tool call. The Notification
-// event with notification_type=permission_prompt is the reliable signal that
-// a real dialog appeared, and covers the same case.
-const EVENTS = {
-  Stop: "finish",
-  Notification: "notify",
-  Elicitation: "notify",
-};
+// PreToolUse:AskUserQuestion chimes on the built-in AskUserQuestion tool —
+// it's a normal tool call, not an MCP Elicitation, so neither Notification
+// nor Elicitation fires for it.
+//
+// PermissionRequest only fires when a tool actually needs a permission
+// decision (anything in permissions.allow never fires it). The `pending`
+// hook arms a lock, spawns a detached worker that waits ~300ms, then plays
+// notify — async so the hook itself doesn't block Claude Code. The
+// unmatched PreToolUse `clear` hook deletes any stale lock left by a
+// crashed worker (defensive cleanup, normally a no-op).
+const EVENTS = [
+  { event: "Stop", sound: "finish" },
+  { event: "Notification", sound: "notify" },
+  { event: "Elicitation", sound: "notify" },
+  { event: "PreToolUse", sound: "notify", matcher: "AskUserQuestion" },
+  { event: "PermissionRequest", sound: "pending" },
+  { event: "PreToolUse", sound: "clear" },
+];
 
 // Marker substring written into every hook command we own. Matched on
 // uninstall and on re-install (to dedupe). Survives the package being moved.
@@ -104,16 +113,18 @@ stripExisting(settings);
 if (action === "install") {
   const playCmd = resolvePlayCommand();
   settings.hooks = settings.hooks || {};
-  for (const [event, sound] of Object.entries(EVENTS)) {
+  for (const { event, sound, matcher } of EVENTS) {
     settings.hooks[event] = settings.hooks[event] || [];
-    settings.hooks[event].push({
+    const entry = {
       hooks: [{ type: "command", command: buildCommand(playCmd, sound) }],
-    });
+    };
+    if (matcher) entry.matcher = matcher;
+    settings.hooks[event].push(entry);
   }
   writeSettings(settings);
-  const summary = Object.entries(EVENTS)
-    .map(([e, s]) => `${e} (${s})`)
-    .join(", ");
+  const summary = EVENTS.map(({ event, sound, matcher }) =>
+    matcher ? `${event}:${matcher} (${sound})` : `${event} (${sound})`,
+  ).join(", ");
   console.log(`✓ claude-sfx hooks installed in ${settingsPath}`);
   console.log(`  events: ${summary}`);
   console.log(`  player: ${playCmd}`);
