@@ -25,7 +25,10 @@ const finishLockPath = path.join(stateDir, "finish.lock");
 const permissionLockPath = path.join(stateDir, "permission.lock");
 
 // Trailing-edge debounce: rapid Stop events collapse to a single chime.
-const FINISH_DEBOUNCE_MS = 1000;
+// Also incidentally lets the UI finish rendering (markdown, suggestions,
+// post-turn work) before the chime — Stop fires when the model signals
+// completion, not when the UI settles.
+const FINISH_DEBOUNCE_MS = 1500;
 // PermissionRequest fires only when a tool needs a real permission
 // decision (allow-rule auto-approvals are silent). We still defer the
 // chime via a detached worker so the hook returns immediately and rapid
